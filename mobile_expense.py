@@ -4,7 +4,7 @@ from firebase_admin import credentials, firestore
 from datetime import datetime
 
 # [모바일 최적화 설정] 화면을 꽉 채우고 사이드바를 숨깁니다.
-st.set_page_config(page_title="천도글라스 현장 지출", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="현장 지출", page_icon="🧾",layout="centered", initial_sidebar_state="collapsed")
 
 # --- [파이어베이스 연결] 스트림릿 비밀 금고에서 열쇠를 꺼냅니다 ---
 import json
