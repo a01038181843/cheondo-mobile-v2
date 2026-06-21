@@ -7,6 +7,70 @@ import json
 # ── 모바일 최적화 설정 ──────────────────────
 st.set_page_config(page_title="현장 지출", page_icon="🧾", layout="centered", initial_sidebar_state="collapsed")
 
+# ── 천도글라스 브랜드 디자인 (모바일 · 화면 모양만, 기능 무관) ──────────────────────
+st.markdown("""
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+:root{ --cd-navy:#1E3A5F; --cd-navy2:#356096; --cd-sky:#2E86AB; --cd-sky2:#4FB3D9;
+  --cd-gold:#F0A500; --cd-gold2:#FFC847; --cd-line:#C7D2E0; --cd-muted:#6B7787; }
+
+html, body, [class*="css"], [data-testid="stAppViewContainer"],
+.stMarkdown, button, input, select, textarea, label{
+  font-family:'Pretendard', -apple-system, system-ui, 'Malgun Gothic', sans-serif !important; }
+
+[data-testid="stAppViewContainer"]{
+  background:radial-gradient(900px 500px at 50% -10%, rgba(79,179,217,0.16), transparent 60%), #EEF2F7; }
+[data-testid="stHeader"]{ background:transparent; }
+[data-testid="stMain"] .block-container{ padding-top:1.2rem; max-width:560px; }
+
+h1,h2,h3,h4{ color:var(--cd-navy) !important; font-weight:800 !important; letter-spacing:-0.01em; }
+
+/* 상단 브랜드 헤더 */
+.cd-mhero{ position:relative; overflow:hidden; border-radius:18px; padding:20px 22px; margin:2px 0 16px;
+  background:linear-gradient(120deg,#1E3A5F 0%,#295082 55%,#2E86AB 130%); color:#fff;
+  box-shadow:0 8px 22px rgba(30,58,95,0.20); }
+.cd-mhero:after{ content:""; position:absolute; right:-30px; top:-40px; width:130px; height:130px;
+  border-radius:50%; background:radial-gradient(circle, rgba(240,165,0,0.30), transparent 70%); }
+.cd-mhero .t{ font-size:21px; font-weight:800; display:flex; align-items:center; gap:9px; position:relative; }
+.cd-mhero .s{ font-size:13px; color:rgba(255,255,255,0.82); margin-top:5px; position:relative; }
+
+/* 입력 라벨/위젯 — 큼직하게, 또렷한 테두리 (모바일 가독성) */
+[data-testid="stWidgetLabel"] p{ color:var(--cd-navy) !important; font-weight:700; font-size:15px; }
+div[data-baseweb="input"], div[data-baseweb="select"] > div, div[data-baseweb="base-input"]{
+  background:#fff !important; border:1.5px solid var(--cd-line) !important; border-radius:12px !important;
+  box-shadow:0 1px 2px rgba(30,58,95,0.05) !important; }
+.stTextInput input, .stNumberInput input, .stDateInput input{
+  background:transparent !important; border:none !important; font-size:16px !important; }
+div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within{
+  border-color:var(--cd-sky) !important; box-shadow:0 0 0 3px rgba(46,134,171,0.14) !important; }
+
+/* 버튼 공통 (모든 상태 색 고정 — 클릭 시 흰색 변하는 문제 예방) */
+.stButton>button, [data-testid="stFormSubmitButton"]>button{
+  border-radius:12px !important; font-weight:700 !important; border:none !important;
+  padding:13px 16px !important; font-size:16px !important; transition:filter .15s, transform .05s; }
+.stButton>button, .stButton>button:hover, .stButton>button:focus,
+.stButton>button:focus-visible, .stButton>button:active{
+  background:linear-gradient(135deg,var(--cd-navy),var(--cd-navy2)) !important; color:#fff !important;
+  box-shadow:none !important; outline:none !important; }
+.stButton>button[kind="primary"], .stButton>button[kind="primary"]:hover,
+.stButton>button[kind="primary"]:focus, .stButton>button[kind="primary"]:active{
+  background:linear-gradient(135deg,var(--cd-sky),var(--cd-sky2)) !important; color:#fff !important; }
+/* 등록(폼 제출) = 골드 그라데이션, 큼직하게 */
+[data-testid="stFormSubmitButton"]>button{
+  background:linear-gradient(135deg,var(--cd-gold2),var(--cd-gold)) !important; color:var(--cd-navy) !important;
+  padding:15px 16px !important; font-size:17px !important; font-weight:800 !important;
+  box-shadow:0 6px 16px rgba(240,165,0,0.30) !important; }
+.stButton>button:active, [data-testid="stFormSubmitButton"]>button:active{ transform:translateY(1px); }
+
+/* 폼 박스 · 알림 둥글게 */
+[data-testid="stForm"]{ background:#fff; border:1px solid #E5E9EF; border-radius:16px;
+  padding:18px 16px; box-shadow:0 1px 3px rgba(30,58,95,0.06); }
+[data-testid="stForm"] h3{ font-size:18px; margin-bottom:4px; }
+[data-testid="stAlert"]{ border-radius:12px; font-size:15px; }
+[data-testid="stExpander"]{ border-radius:12px; }
+</style>
+""", unsafe_allow_html=True)
+
 # ── Firebase 연결 ──────────────────────
 # 스트림릿 비밀 금고(secrets)에서 열쇠를 꺼냅니다
 if not firebase_admin._apps:
@@ -42,8 +106,12 @@ def get_project_list():
 project_list = get_project_list()
 
 # ── 모바일 UI 화면 ──────────────────────
-st.title("📱 현장 지출 간편 등록")
-st.caption("천도글라스 직원 전용 입력 시스템")
+st.markdown("""
+<div class="cd-mhero">
+  <div class="t">📱 현장 지출 간편 등록</div>
+  <div class="s">천도글라스 직원 전용 입력 시스템</div>
+</div>
+""", unsafe_allow_html=True)
 
 if not project_list:
     st.warning("현재 등록된 진행 현장이 없습니다. 사무실에 문의해주세요.")
