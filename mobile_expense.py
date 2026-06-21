@@ -82,10 +82,21 @@ div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-w
 .st-key-cat5 button{ background:#EEF1F5 !important; border-color:#98A2B3 !important; }
 .st-key-cat5 button[kind="primary"]{ background:linear-gradient(135deg,#AAB4C2,#6B7787) !important; color:#fff !important; border-color:transparent !important; box-shadow:0 5px 14px rgba(107,119,135,.30) !important; }
 
-/* 폼 박스 · 알림 둥글게 */
-[data-testid="stForm"]{ background:#fff; border:1px solid #E5E9EF; border-radius:16px;
-  padding:18px 16px; box-shadow:0 1px 3px rgba(30,58,95,0.06); }
-[data-testid="stForm"] h3{ font-size:18px; margin-bottom:4px; }
+/* 지출 항목 카드 — 휴대폰에서도 항상 2열 유지 (Streamlit 기본 세로 쌓임 방지) */
+[data-testid="stHorizontalBlock"]{ display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; gap:12px !important; }
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{
+  width:calc(50% - 6px) !important; flex:1 1 0 !important; min-width:0 !important; }
+
+/* 폼 박스 — 은은한 블루 톤 + 상단 컬러 액센트 바 */
+[data-testid="stForm"]{ position:relative; overflow:hidden;
+  background:linear-gradient(180deg,#FFFFFF 0%, #EFF6FE 100%);
+  border:1px solid #E2EAF3; border-radius:16px;
+  padding:22px 16px 18px; box-shadow:0 6px 18px rgba(30,58,95,0.10); }
+[data-testid="stForm"]::before{ content:""; position:absolute; left:0; right:0; top:0; height:5px;
+  background:linear-gradient(90deg,#F0A500 0%, #2E86AB 55%, #1E3A5F 100%); }
+[data-testid="stForm"] h3{ font-size:18px; margin-bottom:6px; color:var(--cd-navy); }
+/* 폼 안 라벨 — 살짝 키우고 또렷하게 */
+[data-testid="stForm"] [data-testid="stWidgetLabel"] p{ font-size:15px; color:var(--cd-navy) !important; font-weight:700; }
 [data-testid="stAlert"]{ border-radius:12px; font-size:15px; }
 [data-testid="stExpander"]{ border-radius:12px; }
 </style>
@@ -168,16 +179,20 @@ else:
                     st.rerun()
 
         with st.form("expense_form", clear_on_submit=True):
-            st.markdown(f"### 🧾 지출 내역 입력  ·  {st.session_state['category']}")
+            # 제목 — 선택한 항목은 색글씨로 강조 (category는 고정 목록이라 안전)
+            st.markdown(
+                f"<h3>🧾 지출 내역 입력 "
+                f"<span style='color:#2E86AB'>· {st.session_state['category']}</span></h3>",
+                unsafe_allow_html=True)
 
             # 1. 날짜 (기본값: 오늘)
-            i_date = st.date_input("결제 날짜", datetime.now())
+            i_date = st.date_input("📅 결제 날짜", datetime.now())
 
             # 2. 현장 선택 (드롭다운으로 오타 원천 차단)
-            target_project = st.selectbox("시공 현장", project_list)
+            target_project = st.selectbox("🏗️ 시공 현장", project_list)
 
             # 3. 상세 내용
-            item_detail = st.text_input("상세 내역 (예: 점심 식대, 5톤 지게차, 주유비)")
+            item_detail = st.text_input("✏️ 상세 내역 (예: 점심 식대, 5톤 지게차)")
 
             # 4. 작업자 (인건비를 고른 경우에만 표시)
             worker = ""
@@ -185,7 +200,7 @@ else:
                 worker = st.text_input("👷 작업자 성명")
 
             # 5. 금액 입력 (모바일 숫자 키보드 팝업)
-            amount = st.number_input("결제 금액 (원)", min_value=0, step=10000, format="%d")
+            amount = st.number_input("💰 결제 금액 (원)", min_value=0, step=10000, format="%d")
 
             submitted = st.form_submit_button("🚀 등록하기", use_container_width=True)
 
