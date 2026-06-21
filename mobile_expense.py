@@ -44,23 +44,43 @@ div[data-baseweb="input"], div[data-baseweb="select"] > div, div[data-baseweb="b
 div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within{
   border-color:var(--cd-sky) !important; box-shadow:0 0 0 3px rgba(46,134,171,0.14) !important; }
 
-/* 버튼 공통 (모든 상태 색 고정 — 클릭 시 흰색 변하는 문제 예방) */
+/* 버튼 공통 */
 .stButton>button, [data-testid="stFormSubmitButton"]>button{
-  border-radius:12px !important; font-weight:700 !important; border:none !important;
-  padding:13px 16px !important; font-size:16px !important; transition:filter .15s, transform .05s; }
+  border-radius:12px !important; font-weight:700 !important;
+  padding:14px 12px !important; font-size:15.5px !important; min-height:56px;
+  transition:filter .15s, transform .05s, border-color .15s; }
+/* 기본(미선택 항목 카드·새로고침) = 흰 카드 + 테두리 */
 .stButton>button, .stButton>button:hover, .stButton>button:focus,
 .stButton>button:focus-visible, .stButton>button:active{
-  background:linear-gradient(135deg,var(--cd-navy),var(--cd-navy2)) !important; color:#fff !important;
-  box-shadow:none !important; outline:none !important; }
+  background:#fff !important; color:var(--cd-navy) !important;
+  border:1.5px solid var(--cd-line) !important; box-shadow:0 1px 3px rgba(30,58,95,0.06) !important; outline:none !important; }
+.stButton>button:hover{ border-color:var(--cd-sky) !important; background:#F6FAFD !important; }
+/* 선택된 항목(primary) = 스카이→네이비 그라데이션 강조 */
 .stButton>button[kind="primary"], .stButton>button[kind="primary"]:hover,
 .stButton>button[kind="primary"]:focus, .stButton>button[kind="primary"]:active{
-  background:linear-gradient(135deg,var(--cd-sky),var(--cd-sky2)) !important; color:#fff !important; }
+  background:linear-gradient(135deg,var(--cd-sky),var(--cd-navy)) !important; color:#fff !important;
+  border:1.5px solid transparent !important; box-shadow:0 5px 14px rgba(46,134,171,0.32) !important; }
 /* 등록(폼 제출) = 골드 그라데이션, 큼직하게 */
 [data-testid="stFormSubmitButton"]>button{
   background:linear-gradient(135deg,var(--cd-gold2),var(--cd-gold)) !important; color:var(--cd-navy) !important;
-  padding:15px 16px !important; font-size:17px !important; font-weight:800 !important;
+  border:none !important; padding:15px 16px !important; font-size:17px !important; font-weight:800 !important;
   box-shadow:0 6px 16px rgba(240,165,0,0.30) !important; }
 .stButton>button:active, [data-testid="stFormSubmitButton"]>button:active{ transform:translateY(1px); }
+
+/* ── 지출 항목 카드별 색 (key=cat0~cat5 → .st-key-catN) ── */
+/* 미선택: 연한 톤 배경 + 색 테두리 / 선택(primary): 진한 그라데이션 + 흰 글씨 */
+.st-key-cat0 button{ background:#FFF1EE !important; border-color:#F8856F !important; }
+.st-key-cat0 button[kind="primary"]{ background:linear-gradient(135deg,#FB8A7A,#EF5337) !important; color:#fff !important; border-color:transparent !important; box-shadow:0 5px 14px rgba(239,83,55,.30) !important; }
+.st-key-cat1 button{ background:#FFF7E2 !important; border-color:#F0B33C !important; }
+.st-key-cat1 button[kind="primary"]{ background:linear-gradient(135deg,#FFC847,#E89200) !important; color:#fff !important; border-color:transparent !important; box-shadow:0 5px 14px rgba(232,146,0,.30) !important; }
+.st-key-cat2 button{ background:#EAF4FB !important; border-color:#4FB3D9 !important; }
+.st-key-cat2 button[kind="primary"]{ background:linear-gradient(135deg,#4FB3D9,#2E86AB) !important; color:#fff !important; border-color:transparent !important; box-shadow:0 5px 14px rgba(46,134,171,.30) !important; }
+.st-key-cat3 button{ background:#F1ECFA !important; border-color:#9B82D6 !important; }
+.st-key-cat3 button[kind="primary"]{ background:linear-gradient(135deg,#A98FE0,#7857C9) !important; color:#fff !important; border-color:transparent !important; box-shadow:0 5px 14px rgba(120,87,201,.30) !important; }
+.st-key-cat4 button{ background:#E9F7EF !important; border-color:#4CBE86 !important; }
+.st-key-cat4 button[kind="primary"]{ background:linear-gradient(135deg,#58C98E,#2E9E63) !important; color:#fff !important; border-color:transparent !important; box-shadow:0 5px 14px rgba(46,158,99,.30) !important; }
+.st-key-cat5 button{ background:#EEF1F5 !important; border-color:#98A2B3 !important; }
+.st-key-cat5 button[kind="primary"]{ background:linear-gradient(135deg,#AAB4C2,#6B7787) !important; color:#fff !important; border-color:transparent !important; box-shadow:0 5px 14px rgba(107,119,135,.30) !important; }
 
 /* 폼 박스 · 알림 둥글게 */
 [data-testid="stForm"]{ background:#fff; border:1px solid #E5E9EF; border-radius:16px;
@@ -130,8 +150,25 @@ else:
             st.session_state['submitted'] = False
             st.rerun()
     else:
+        # ── 지출 항목: 6개 카드 버튼으로 직관 선택 (한 번 탭) ──────────────────────
+        # st.form 안에서는 일반 버튼을 못 쓰므로, 항목 카드는 폼 '밖'에서 고르고 결과를 세션에 저장
+        if 'category' not in st.session_state:
+            st.session_state['category'] = '식대/경비'
+        st.markdown("#### 💳 지출 항목 — 눌러서 선택")
+        cat_cards = [("식대/경비", "🍱"), ("장비비", "🚜"), ("자재비", "🧱"),
+                     ("외주비", "🤝"), ("인건비", "👷"), ("기타", "📦")]
+        for r in range(0, len(cat_cards), 2):
+            cols = st.columns(2)
+            for j, (name, icon) in enumerate(cat_cards[r:r + 2]):
+                is_sel = (st.session_state['category'] == name)
+                # key=cat0~cat5 → CSS의 .st-key-catN 으로 카드별 색 지정
+                if cols[j].button(f"{icon}  {name}", key=f"cat{r + j}", use_container_width=True,
+                                  type=("primary" if is_sel else "secondary")):
+                    st.session_state['category'] = name
+                    st.rerun()
+
         with st.form("expense_form", clear_on_submit=True):
-            st.markdown("### 🧾 지출 내역 입력")
+            st.markdown(f"### 🧾 지출 내역 입력  ·  {st.session_state['category']}")
 
             # 1. 날짜 (기본값: 오늘)
             i_date = st.date_input("결제 날짜", datetime.now())
@@ -139,13 +176,13 @@ else:
             # 2. 현장 선택 (드롭다운으로 오타 원천 차단)
             target_project = st.selectbox("시공 현장", project_list)
 
-            # 3. 지출 항목 선택 (PC 프로그램과 카테고리 일치)
-            cat_list = ["식대/경비", "장비비", "자재비", "외주비", "인건비", "기타"]
-            category = st.selectbox("지출 항목", cat_list)
-
-            # 4. 상세 내용 및 작업자
+            # 3. 상세 내용
             item_detail = st.text_input("상세 내역 (예: 점심 식대, 5톤 지게차, 주유비)")
-            worker = st.text_input("작업자 성명 (인건비인 경우만 입력)")
+
+            # 4. 작업자 (인건비를 고른 경우에만 표시)
+            worker = ""
+            if st.session_state['category'] == '인건비':
+                worker = st.text_input("👷 작업자 성명")
 
             # 5. 금액 입력 (모바일 숫자 키보드 팝업)
             amount = st.number_input("결제 금액 (원)", min_value=0, step=10000, format="%d")
@@ -153,6 +190,8 @@ else:
             submitted = st.form_submit_button("🚀 등록하기", use_container_width=True)
 
             if submitted:
+                # 선택한 지출 항목(카드)을 사용
+                category = st.session_state['category']
                 # ── 입력값 검증 ──────────────────────
                 if amount <= 0:
                     st.error("⚠️ 결제 금액을 정확히 입력해주세요.")
