@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>천도글라스 현장 지출앱</title>
+<style>
+  :root{ --navy:#1E3A5F; --navy2:#295082; --sky:#2E86AB; --sky2:#4FB3D9;
+         --gold:#F0A500; --gold2:#FFC847; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    font-family:'Pretendard', -apple-system, system-ui, 'Malgun Gothic', sans-serif;
+    background:linear-gradient(160deg,#1E3A5F 0%,#295082 55%,#2E86AB 130%);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    min-height:100%; padding:24px; text-align:center; -webkit-font-smoothing:antialiased;
+  }
+  .box{ width:100%; max-width:380px; }
+  .logo{ font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; }
+  .sub{ font-size:14px; color:rgba(255,255,255,0.8); margin-bottom:30px; }
+
+  .spin{ width:46px; height:46px; margin:0 auto 18px;
+    border:4px solid rgba(255,255,255,0.25); border-top-color:#FFC847; border-radius:50%;
+    animation:rot 0.9s linear infinite; }
+  @keyframes rot{ to{ transform:rotate(360deg); } }
+  .loading{ font-size:15px; color:rgba(255,255,255,0.9); }
+
+  /* 수동 안내 (자동 전환 실패 시 노출) */
+  .manual{ display:none; margin-top:8px; }
+  .manual.show{ display:block; animation:fade .3s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+  .manual p.head{ font-size:16px; font-weight:700; margin-bottom:6px; }
+  .manual p.desc{ font-size:13.5px; color:rgba(255,255,255,0.82); line-height:1.6; margin-bottom:20px; }
+  .btn{ display:block; width:100%; padding:17px; border-radius:14px; border:none;
+    font-family:inherit; font-size:17px; font-weight:800; cursor:pointer; text-decoration:none;
+    background:linear-gradient(135deg,var(--gold2),var(--gold)); color:var(--navy);
+    box-shadow:0 8px 20px rgba(240,165,0,0.35); margin-bottom:14px; }
+  .btn:active{ transform:translateY(1px); }
+  .hint{ font-size:12.5px; color:rgba(255,255,255,0.7); line-height:1.6;
+    background:rgba(255,255,255,0.10); border-radius:12px; padding:12px 14px; }
+  .hint b{ color:#FFC847; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">천도글라스</div>
+    <div class="sub">현장 지출 간편 등록</div>
+
+    <div id="auto">
+      <div class="spin"></div>
+      <div class="loading">입력 화면을 여는 중…</div>
+    </div>
+
+    <div id="manual" class="manual">
+      <p class="head">👇 아래 버튼을 눌러주세요</p>
+      <p class="desc">카카오톡 안에서는 입력칸이 잘 안 눌립니다.<br>버튼을 누르면 인터넷 브라우저로 열립니다.</p>
+      <a id="openBtn" class="btn" href="#">📱 입력 화면 열기</a>
+      <div class="hint">
+        그래도 안 열리면 → 오른쪽 위 <b>⋮</b>(점 세 개) 또는 아래 <b>공유 아이콘</b> →
+        <b>"다른 브라우저로 열기"</b> (Chrome / Samsung Internet)
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ── 실제 입력앱(Streamlit) 주소 ──
+  var TARGET = "https://cheondo-mobile-v2-az9wlmsq2y2fgrarbcgnsu.streamlit.app/";
+  var ua = (navigator.userAgent || "").toLowerCase();
+  var isAndroid = /android/.test(ua);
+  var isKakao = ua.indexOf("kakaotalk") !== -1;
+  // 카톡 외 다른 인앱 브라우저들(네이버·라인·인스타·페북·밴드 등)
+  var isOtherInApp = /naver|line\/|inapp|instagram|fban|fbav|band|kakaostory|everytimeapp|whale/.test(ua);
+
+  // 수동 버튼은 항상 TARGET을 직접 가리킴(최후 보루)
+  document.getElementById("openBtn").setAttribute("href", TARGET);
+
+  function showManual(){
+    document.getElementById("auto").style.display = "none";
+    document.getElementById("manual").classList.add("show");
+  }
+
+  function tryEscape(){
+    if (isKakao){
+      // 카카오톡: 외부 브라우저 강제 오픈
+      location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(TARGET);
+      // 혹시 실패하면 수동 버튼 노출
+      setTimeout(showManual, 1500);
+    } else if (isOtherInApp && isAndroid){
+      // 안드로이드 기타 인앱: 크롬 인텐트로 강제
+      var cleaned = TARGET.replace(/^https?:\/\//, "");
+      location.href = "intent://" + cleaned + "#Intent;scheme=https;package=com.android.chrome;end";
+      setTimeout(showManual, 1500);
+    } else if (isOtherInApp){
+      // iOS 기타 인앱: 자동 탈출 불가 → 수동 안내
+      showManual();
+    } else {
+      // 일반 브라우저: 바로 입력앱으로
+      location.replace(TARGET);
+    }
+  }
+
+  // 약간의 지연 후 실행(스크립트 안정화)
+  setTimeout(tryEscape, 250);
+</script>
+</body>
+</html>
