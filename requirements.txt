@@ -1,7 +1,5 @@
 streamlit
-pandas==2.2.3
-numpy>=2.1,<2.2
-pyarrow==18.1.0
+pandas
 plotly
 firebase-admin
 openpyxl
