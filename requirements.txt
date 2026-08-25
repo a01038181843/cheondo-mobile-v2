@@ -2,4 +2,8 @@ streamlit
 pandas
 plotly
 firebase-admin
+# 2026-08-25 google-api-core 2.35.0 버그 회피용 고정
+# 2.35.0이 경로 변수를 URL 인코딩하면서 기본 DB 이름 (default) -> %28default%29 로 바뀌어
+# Firestore 접속이 "400 Invalid database id %28default%29" 로 전부 실패함. 2.34.0에서는 정상.
+google-api-core[grpc]<2.35
 openpyxl
