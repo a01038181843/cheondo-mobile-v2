@@ -32,6 +32,7 @@ MEMORY_MAX_ASKS = 10                     # 한 접속에서 폰 기억을 물어
 PRESET_SECONDS = 8                       # 화면을 연 지 이 시간이 지나 도착한 기억으로는 현장을 미리 고르지 않음
 CHIP_LABEL_CHARS = 12                    # 내역 단추에 보이는 최대 글자 수
 DOUBLE_TAP_SECONDS = 10                  # 이 시간 안에 똑같은 값으로 또 누르면 '두 번 누름'으로 보고 한 번만 저장
+AWAY_SECONDS = 30 * 60                   # 이만큼 안 만지다 다시 쓰면 '덮었다 다시 연 것'으로 봄
 KST = timezone(timedelta(hours=9))
 
 # 이 폰 기억칸 — 화면에 안 보이는 작은 부품입니다. 브라우저 저장소(localStorage)에서 기억 글을 한 번 읽어
@@ -439,6 +440,7 @@ ss = st.session_state
 
 def pick_site(name: str):
     ss['site'] = name
+    ss['site_preset'] = True          # 직원이 고른 뒤에는 폰 기억으로 미리 고르지 않음
     ss['dup_pending'] = None
 
 
@@ -446,6 +448,10 @@ def pick_site_from_list():
     if ss.get('site_pick'):
         pick_site(ss['site_pick'])
     ss['site_pick'] = None            # 찾기 칸은 비워 둠(다음에 단추로 고르면 헷갈리지 않게)
+
+
+def pick_date():
+    ss['date_picked'] = True          # 직접 고른 날짜는 자정이 지나도 그대로 둠
 
 
 def pick_category(name: str):
@@ -569,10 +575,18 @@ if not load_error:                        # 목록을 못 읽은 동안엔 고�
             ss['site'] = default_site(ss['memory'], index)
 ss.setdefault('category', CATEGORIES[0])
 ss.setdefault('f_date', kst_today())
-# 화면을 밤새 켜 두었다가 다음 날 쓰면: 날짜 기본값을 오늘로, '오늘 넣은 것'은 비웁니다
-if ss.setdefault('opened_day', kst_today()) != kst_today():
-    ss['opened_day'] = ss['f_date'] = kst_today()
+# 날이 바뀌면: '오늘 넣은 것'은 비우고, 날짜는 오늘로. 단 직접 고른 날짜는 이어서 쓰는 동안 그대로 두고
+# 오래 덮었다 다시 열었을 때(다음 날 아침 등)만 오늘로 바꿉니다
+today = kst_today()
+now = time.time()
+was_away = now - ss.get('last_seen', now) > AWAY_SECONDS
+ss['last_seen'] = now
+if ss.setdefault('rows_day', today) != today:
+    ss['rows_day'] = today
     ss['today_rows'] = []
+if ss.setdefault('opened_day', today) != today and (was_away or not ss.get('date_picked')):
+    ss['opened_day'] = ss['f_date'] = today
+    ss['date_picked'] = False
 ss.setdefault('f_item', '')
 ss.setdefault('f_worker', '')
 ss.setdefault('f_amount', 0)
@@ -626,7 +640,7 @@ with st.container(border=True):
                            type="primary" if ss['category'] == name else "secondary",
                            on_click=pick_category, args=(name,))
 
-    st.date_input("결제 날짜", key="f_date")
+    st.date_input("결제 날짜", key="f_date", on_change=pick_date)
 
     # 이름표 → 내역 단추 → 입력칸 순서(단추가 '상세 내역'에 딸린 것으로 보이게)
     st.markdown('<p class="cd-label">상세 내역</p>', unsafe_allow_html=True)
