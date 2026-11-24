@@ -7,7 +7,6 @@ import urllib.parse
 from datetime import date, datetime, timedelta, timezone
 
 import streamlit as st
-import streamlit.components.v1 as components
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -23,15 +22,47 @@ CATEGORY_ICONS = {"식대/경비": "🍱", "장비비": "🚜", "자재비": "�
 PLACEHOLDERS = {"식대/경비": "예: 점심 식대 5명", "장비비": "예: 5톤 지게차", "자재비": "예: 실리콘 2박스",
                 "외주비": "예: 실리콘 코킹 외주", "인건비": "예: 일당", "기타": "예: 주차비"}
 FOOD_QUICK_ITEMS = [("점심", "점심 식대"), ("저녁", "저녁 식대"), ("간식·음료", "간식·음료")]
-MEMORY_COOKIE = "cd_mobile_memory"      # 이 폰이 최근에 쓴 현장·내역을 기억하는 쿠키 이름
+MEMORY_NAME = "cd_mobile_memory"        # 이 폰(브라우저 저장소)에 최근 현장·내역을 적어 두는 이름
 MAX_RECENT_SITES = 3                     # 최근 현장 단추 개수
 MEMORY_SITES_KEEP = 5                    # 기억해 두는 현장 수
 MEMORY_ITEMS_KEEP = 3                    # 항목마다 기억해 두는 내역 수
 MEMORY_ITEM_CHARS = 30                   # 기억하는 내역 한 개의 최대 글자 수
-MEMORY_MAX_CHARS = 3000                  # 쿠키 글 길이 상한(브라우저 한도 약 4KB)
+MEMORY_MAX_CHARS = 3000                  # 기억 글 길이 상한(쿠키 쓰던 때 한도 그대로)
+MEMORY_MAX_ASKS = 10                     # 한 접속에서 폰 기억을 물어보는 횟수 상한(끝없이 다시 그리지 않게)
+PRESET_SECONDS = 8                       # 화면을 연 지 이 시간이 지나 도착한 기억으로는 현장을 미리 고르지 않음
 CHIP_LABEL_CHARS = 12                    # 내역 단추에 보이는 최대 글자 수
 DOUBLE_TAP_SECONDS = 10                  # 이 시간 안에 똑같은 값으로 또 누르면 '두 번 누름'으로 보고 한 번만 저장
 KST = timezone(timedelta(hours=9))
+
+# 이 폰 기억칸 — 화면에 안 보이는 작은 부품입니다. 브라우저 저장소(localStorage)에서 기억 글을 한 번 읽어
+# 파이썬에 넘기고(raw), 등록하면 새 기억 글(save)을 받아 적습니다.
+# 쿠키를 안 쓰는 이유: Streamlit Cloud 가 쿠키를 앱에 넘기지 않아 서버에선 기억이 안 됐습니다(2026-11-24).
+# 한 번 쓰고 사라지는 값(setTriggerValue)으로 보내는 이유: 남는 값이면 폰을 오래 덮었다 열 때(새 접속)
+# 처음 읽은 옛 기억이 되살아나 엉뚱한 현장이 미리 골라집니다.
+MEMORY_JS = """
+export default function(component) {
+  const { data, setTriggerValue } = component;
+  const name = data.name;
+  if (data.need) {                          // 물어보는 중이면 읽기만(옛 기억을 덮어쓰지 않게)
+    let raw = null;
+    try { raw = window.localStorage.getItem(name); } catch (e) {}
+    try {                                   // 예전 쿠키 기억은 한 번 옮기고 지움
+      const old = document.cookie.split('; ').find((c) => c.startsWith(name + '='));
+      if (old) {
+        if (!raw) {
+          raw = old.slice(name.length + 1);
+          window.localStorage.setItem(name, raw);
+        }
+        document.cookie = name + '=; path=/; max-age=0; SameSite=Lax';
+      }
+    } catch (e) {}
+    setTriggerValue('raw', raw || 'none');  // 기억이 없어도 '없음'을 알려 줌
+  } else if (data.save && window.cdMemorySaved !== data.save) {
+    window.cdMemorySaved = data.save;       // 같은 글은 한 번만 적음(다른 탭이 적은 새 기억을 되돌리지 않게)
+    try { window.localStorage.setItem(name, data.save); } catch (e) {}
+  }
+}
+"""
 
 
 # ── 순수 함수 (화면·장부와 떨어져 있어 따로 시험합니다) ──────────────────────
@@ -108,7 +139,7 @@ def ordered_site_names(index: dict, include_closed: bool) -> list:
 
 
 def parse_memory(raw) -> dict:
-    """쿠키 글(URL 인코딩된 JSON)을 기억으로 읽습니다. 무엇이 와도 멈추지 않고, 모양이 틀리면 빈 기억."""
+    """기억 글(URL 인코딩된 JSON)을 기억으로 읽습니다. 무엇이 와도 멈추지 않고, 모양이 틀리면 빈 기억."""
     empty = {"sites": [], "items": {}}
     try:
         data = json.loads(urllib.parse.unquote(str(raw or ""), errors="strict"))
@@ -130,7 +161,7 @@ def parse_memory(raw) -> dict:
 
 
 def dump_memory(memory: dict) -> str:
-    """기억을 쿠키에 넣을 글로 바꿉니다(따옴표·세미콜론 없는 URL 인코딩). 너무 길면 오래된 내역부터 줄입니다."""
+    """기억을 폰에 적어 둘 글로 바꿉니다(따옴표·세미콜론 없는 URL 인코딩). 너무 길면 오래된 내역부터 줄입니다."""
     sites = list(memory.get("sites", []))
     items = {k: list(v) for k, v in memory.get("items", {}).items()}
 
@@ -159,6 +190,16 @@ def remember(memory: dict, site: str, category: str, item: str) -> dict:
     if text:
         items[category] = ([text] + [v for v in items.get(category, []) if v != text])[:MEMORY_ITEMS_KEEP]
     return {"sites": sites[:MEMORY_SITES_KEEP], "items": items}
+
+
+def merge_memory(newer: dict, older: dict) -> dict:
+    """두 기억을 합칩니다 — newer(이번 접속에서 쓴 것)가 앞, 같은 것은 한 번만."""
+    def join(first, second, keep):
+        return list(dict.fromkeys(first + second))[:keep]
+    newer_items, older_items = newer.get("items", {}), older.get("items", {})
+    items = {category: join(newer_items.get(category, []), older_items.get(category, []), MEMORY_ITEMS_KEEP)
+             for category in CATEGORIES if newer_items.get(category) or older_items.get(category)}
+    return {"sites": join(newer.get("sites", []), older.get("sites", []), MEMORY_SITES_KEEP), "items": items}
 
 
 def recent_site_buttons(memory: dict, index: dict) -> tuple:
@@ -261,6 +302,7 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"],
 [data-testid="stAppViewContainer"]{ background:var(--cd-bg); }
 [data-testid="stHeader"]{ background:transparent; }
 [data-testid="stMain"] .block-container{ padding-top:2.6rem; padding-bottom:3rem; max-width:560px; }
+div:has(> .st-key-cd_memory_box){ position:absolute !important; width:0 !important; height:0 !important; overflow:hidden; }  /* 폰 기억칸 — 안 보임 */
 
 /* 맨 위 현장 머리 카드 — 지금 어느 현장에 넣는지 크게 */
 .cd-head{ background:var(--cd-navy); color:#fff; border-radius:16px; padding:18px 20px 20px; margin:0 0 14px; }
@@ -462,8 +504,41 @@ def save_entry(force: bool = False):
     ss['f_item'], ss['f_amount'], ss['f_worker'] = '', 0, ''
     ss['today_rows'].insert(0, dict(record, 현장=site))
     ss['memory'] = remember(ss['memory'], site, record['항목'], record['내역'])
-    ss['cookie_pending'] = dump_memory(ss['memory'])
+    ss['memory_save'] = dump_memory(ss['memory'])
     ss['flash'] = ('ok', saved_message)
+
+
+def take_phone_memory():
+    """폰이 답했을 때(화면을 다시 그리기 전에 실행) — 첫 답만 쓰고, 그 사이 등록한 것이 있으면 합칩니다."""
+    if ss.get('memory_ready'):
+        return
+    try:
+        raw = ss[MEMORY_NAME]['raw']
+    except Exception as e:
+        print(f"[폰 지출] 폰 기억을 못 읽음: {e!r}")
+        return
+    if raw is None:
+        return
+    ss['memory_ready'] = True
+    ss['memory'] = merge_memory(ss['memory'], parse_memory(raw))
+    if ss['memory_save']:
+        ss['memory_save'] = dump_memory(ss['memory'])
+
+
+def place_phone_memory():
+    """이 폰 기억칸을 놓습니다. 기억은 편의일 뿐이라, 부품이 안 되는 환경이어도 앱은 그대로 돌아갑니다.
+    need = 몇 번째로 물어보는지(0이면 안 물음 — 숫자가 바뀌어야 폰 쪽이 다시 답합니다), save = 적어 둘 글."""
+    need = 0
+    if not ss['memory_ready'] and ss['memory_asks'] < MEMORY_MAX_ASKS:
+        ss['memory_asks'] += 1
+        need = ss['memory_asks']
+    try:
+        with st.container(key="cd_memory_box"):
+            slot = st.components.v2.component("cd_phone_memory", js=MEMORY_JS)
+            slot(key=MEMORY_NAME, data={"name": MEMORY_NAME, "need": need, "save": ss['memory_save']},
+                 on_raw_change=take_phone_memory)
+    except Exception as e:
+        print(f"[폰 지출] 폰 기억칸을 쓸 수 없음: {e!r}")
 
 
 # ── 처음 열 때 준비 ──────────────────────
@@ -474,17 +549,24 @@ except Exception as e:
     print(f"[폰 지출] 현장 목록 읽기 실패: {e!r}")
     index, load_error = {}, "현장 목록을 불러오지 못했어요. 와이파이/데이터를 확인하고 '다시 불러오기'를 눌러 주세요."
 
-if 'memory' not in ss:
-    try:
-        raw_cookie = st.context.cookies.get(MEMORY_COOKIE)
-    except Exception:
-        raw_cookie = None                 # 쿠키를 못 읽는 환경이면 기억 없이 시작
-    ss['memory'] = parse_memory(raw_cookie)
+# 폰 기억은 화면이 뜬 뒤에 도착합니다(첫 실행엔 없음 → take_phone_memory 가 받음)
+ss.setdefault('memory', {"sites": [], "items": {}})
+ss.setdefault('memory_ready', False)      # 폰이 답했는지
+ss.setdefault('memory_asks', 0)           # 지금까지 물어본 횟수
+ss.setdefault('memory_save', "")          # 폰에 적어 둘 글
+ss.setdefault('opened_at', time.time())
+ss.setdefault('site', None)
+ss.setdefault('site_preset', False)       # 현장 미리 고르기를 이미 했는지
+place_phone_memory()
 if not load_error:                        # 목록을 못 읽은 동안엔 고르기를 미뤄 둡니다(다시 불러오면 그때 정함)
-    if 'site' not in ss:
-        ss['site'] = default_site(ss['memory'], index)
-    elif ss['site'] and ss['site'] not in index:
+    if ss['site'] and ss['site'] not in index:
         ss['site'] = None                 # 그 사이 현장이 지워졌거나 이름이 바뀌었으면 다시 고르게
+    if ss['memory_ready'] and not ss['site_preset']:
+        ss['site_preset'] = True          # 미리 고르기는 접속마다 딱 한 번
+        # 이미 골랐거나, 입력을 시작했거나, 늦게 도착했으면 건드리지 않음(모르는 사이 현장이 채워지면 안 됨)
+        untouched = not ss['site'] and not ss.get('f_item') and not ss.get('f_amount')
+        if untouched and time.time() - ss['opened_at'] <= PRESET_SECONDS:
+            ss['site'] = default_site(ss['memory'], index)
 ss.setdefault('category', CATEGORIES[0])
 ss.setdefault('f_date', kst_today())
 # 화면을 밤새 켜 두었다가 다음 날 쓰면: 날짜 기본값을 오늘로, '오늘 넣은 것'은 비웁니다
@@ -521,8 +603,9 @@ with st.container(border=True):
     if buttons:
         hint = "최근 기록 순 현장" if is_fallback else "이 폰에서 쓴 현장이 맨 앞"
         st.markdown(f'<p class="cd-hint">{hint}</p>', unsafe_allow_html=True)
-    for i, name in enumerate(buttons):
-        st.button(name, key=f"rs{i}", width='stretch', type="primary" if name == site else "secondary",
+    for name in buttons:
+        # 단추 이름표(key)에 현장 이름을 넣습니다 — 목록이 바뀌는 순간 눌러도 화면에 보인 그 현장이 골라지게
+        st.button(name, key=f"rs_{name}", width='stretch', type="primary" if name == site else "secondary",
                   on_click=pick_site, args=(name,))
     show_closed = st.checkbox("끝난 현장도 보기", key="show_closed")
     names = ordered_site_names(index, show_closed)
@@ -605,12 +688,3 @@ with st.expander("❓ 입력이 안 될 때"):
     if st.button("🔄 현장 목록 새로고침", key="reload_bottom"):
         st.cache_data.clear()
         st.rerun()
-
-# 등록에 성공했으면 이 폰에 기억을 씁니다(쓰기가 막힌 폰이어도 화면 동작엔 영향 없음).
-# 화면 맨 아래에 두는 이유: 위쪽에 끼우면 등록할 때마다 화면이 맨 위로 튑니다.
-if ss.get('cookie_pending'):
-    value = json.dumps(ss['cookie_pending'])
-    components.html(
-        "<script>try{window.parent.document.cookie=" + json.dumps(MEMORY_COOKIE + "=") + "+" + value +
-        "+'; path=/; max-age=15552000; SameSite=Lax';}catch(e){}</script>", height=0)
-    ss['cookie_pending'] = None

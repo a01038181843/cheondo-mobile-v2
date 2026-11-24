@@ -2,105 +2,243 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
 <title>천도글라스 현장 지출앱</title>
 <style>
-  :root{ --navy:#1E3A5F; --navy2:#295082; --sky:#2E86AB; --sky2:#4FB3D9;
-         --gold:#F0A500; --gold2:#FFC847; }
+  /* 폰 앱(mobile_expense.py)과 같은 색 — 밝은 바탕 + 네이비 머리 카드 */
+  :root{ --navy:#1E3A5F; --navy-ink:#15293F; --sky:#2E86AB; --gold:#F0A500;
+         --line:#DCE3EC; --muted:#5F6B7A; --bg:#F3F5F8; }
   *{ box-sizing:border-box; margin:0; padding:0; }
-  html,body{ height:100%; }
-  body{
-    font-family:'Pretendard', -apple-system, system-ui, 'Malgun Gothic', sans-serif;
-    background:linear-gradient(160deg,#1E3A5F 0%,#295082 55%,#2E86AB 130%);
-    color:#fff; display:flex; align-items:center; justify-content:center;
-    min-height:100%; padding:24px; text-align:center; -webkit-font-smoothing:antialiased;
-  }
-  .box{ width:100%; max-width:380px; }
-  .logo{ font-size:26px; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; }
-  .sub{ font-size:14px; color:rgba(255,255,255,0.8); margin-bottom:30px; }
+  body{ font-family:'Pretendard', -apple-system, system-ui, 'Malgun Gothic', sans-serif;
+    background:var(--bg); color:var(--navy-ink); padding:20px 16px 32px; word-break:keep-all;
+    -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%; }
+  .wrap{ width:100%; max-width:440px; margin:0 auto; }
+  .head{ background:var(--navy); color:#fff; border-radius:16px; padding:14px 20px 16px; margin-bottom:16px; }
+  .head .k{ font-size:13px; color:#9CC7DB; }
+  .head h1{ font-size:21px; font-weight:800; line-height:1.3; margin-top:2px; }
 
-  .spin{ width:46px; height:46px; margin:0 auto 18px;
-    border:4px solid rgba(255,255,255,0.25); border-top-color:#FFC847; border-radius:50%;
-    animation:rot 0.9s linear infinite; }
+  .panel{ display:none; }
+  .panel.show{ display:block; }
+  .lead{ font-size:22px; font-weight:800; color:var(--navy); line-height:1.35; }
+  .desc{ font-size:16px; line-height:1.55; margin-top:4px; }
+
+  /* 여는 중 */
+  #loading{ text-align:center; padding:64px 0; }
+  .spin{ width:44px; height:44px; margin:0 auto 16px; border:4px solid var(--line);
+    border-top-color:var(--navy); border-radius:50%; animation:rot .9s linear infinite; }
   @keyframes rot{ to{ transform:rotate(360deg); } }
-  .loading{ font-size:15px; color:rgba(255,255,255,0.9); }
+  @media (prefers-reduced-motion:reduce){ .spin{ animation-duration:3s; } }
+  #loading p{ font-size:17px; color:var(--muted); }
 
-  /* 수동 안내 (자동 전환 실패 시 노출) */
-  .manual{ display:none; margin-top:8px; }
-  .manual.show{ display:block; animation:fade .3s ease; }
-  @keyframes fade{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
-  .manual p.head{ font-size:16px; font-weight:700; margin-bottom:6px; }
-  .manual p.desc{ font-size:13.5px; color:rgba(255,255,255,0.82); line-height:1.6; margin-bottom:20px; }
-  .btn{ display:block; width:100%; padding:17px; border-radius:14px; border:none;
-    font-family:inherit; font-size:17px; font-weight:800; cursor:pointer; text-decoration:none;
-    background:linear-gradient(135deg,var(--gold2),var(--gold)); color:var(--navy);
-    box-shadow:0 8px 20px rgba(240,165,0,0.35); margin-bottom:14px; }
-  .btn:active{ transform:translateY(1px); }
-  .hint{ font-size:12.5px; color:rgba(255,255,255,0.7); line-height:1.6;
-    background:rgba(255,255,255,0.10); border-radius:12px; padding:12px 14px; }
-  .hint b{ color:#FFC847; }
+  /* 깨우는 순서 */
+  .steps{ list-style:none; margin:14px 0 16px; background:#fff; border:1px solid var(--line); border-radius:14px; }
+  .steps li{ display:flex; gap:12px; padding:13px 16px; font-size:16px; line-height:1.5; }
+  .steps li + li{ border-top:1px solid var(--line); }
+  .steps .n{ flex:none; font-weight:800; color:var(--sky); }
+  .steps b{ color:var(--navy); }
+  .steps .body{ flex:1; min-width:0; }
+  /* 다음에 나올 영어 화면을 그대로 그린 그림 */
+  .shot{ display:block; width:100%; height:auto; margin-top:10px; border:1px solid var(--line); border-radius:8px; }
+
+  .btn{ display:block; width:100%; padding:17px 12px; border-radius:10px; font-size:18px; font-weight:800;
+    text-align:center; text-decoration:none; background:var(--gold); color:var(--navy-ink); }
+  .btn:active{ background:#D99500; }
+  .btn:focus-visible{ outline:3px solid var(--sky); outline-offset:2px; }
+  #manual .btn{ margin-top:18px; }
+  .note{ font-size:14px; color:var(--muted); line-height:1.6; margin-top:12px; }
+  .note b{ color:var(--navy); }
 </style>
 </head>
 <body>
-  <div class="box">
-    <div class="logo">천도글라스</div>
-    <div class="sub">현장 지출 간편 등록</div>
+<div class="wrap">
+  <div class="head"><div class="k">천도글라스</div><h1>현장 지출 등록</h1></div>
 
-    <div id="auto">
-      <div class="spin"></div>
-      <div class="loading">입력 화면을 여는 중…</div>
-    </div>
+  <!-- 여는 중 -->
+  <section id="loading" class="panel show" aria-live="polite">
+    <div class="spin"></div>
+    <p>입력 화면을 여는 중…</p>
+  </section>
 
-    <div id="manual" class="manual">
-      <p class="head">👇 아래 버튼을 눌러주세요</p>
-      <p class="desc">카카오톡 안에서는 입력칸이 잘 안 눌립니다.<br>버튼을 누르면 인터넷 브라우저로 열립니다.</p>
-      <a id="openBtn" class="btn" href="#">📱 입력 화면 열기</a>
-      <div class="hint">
-        그래도 안 열리면 → 오른쪽 위 <b>⋮</b>(점 세 개) 또는 아래 <b>공유 아이콘</b> →
-        <b>"다른 브라우저로 열기"</b> (Chrome / Samsung Internet)
-      </div>
-    </div>
-  </div>
+  <!-- 카카오톡 같은 앱 안에서 자동으로 못 빠져나왔을 때 -->
+  <section id="manual" class="panel">
+    <p class="lead">아래 단추를 눌러 주세요</p>
+    <p class="desc">카카오톡 안에서는 입력칸이 잘 안 눌립니다. 인터넷 브라우저에서 열어 주세요.</p>
+    <a id="openBtn" class="btn" href="#">입력 화면 열기</a>
+    <p class="note">입력칸이 안 눌리면 오른쪽 위 <b>⋮</b>(점 세 개) 또는 아래 <b>공유 아이콘</b>에서
+      <b>다른 브라우저로 열기</b>(Chrome · 삼성 인터넷)를 눌러 주세요.</p>
+    <p class="note">영어로 <b>Zzzz</b> 화면이 나오면 파란 단추 <b>Yes, get this app back up!</b>을 한 번 누르고
+      30초쯤 기다려 주세요.</p>
+  </section>
+
+  <!-- 앱이 잠들었을 때 -->
+  <section id="asleep" class="panel" aria-live="polite">
+    <p class="lead" id="asleepLead">앱이 쉬고 있어요</p>
+    <p class="desc" id="asleepDesc">오래 안 쓰면 앱이 잠듭니다. 한 번만 깨워 주세요.</p>
+    <ol class="steps">
+      <li><span class="n">1</span><div class="body">다음 화면이 영어로 나오면 <b>파란 단추를 한 번</b> 누르세요.
+        <svg class="shot" viewBox="0 0 320 126" role="img" aria-label="다음에 나올 영어 화면 그림. 파란 단추를 누르세요.">
+          <rect width="320" height="126" fill="#fff"/>
+          <circle cx="30" cy="28" r="14" fill="#F6D65B" stroke="#E0B53A" stroke-width="1.5"/>
+          <path d="M22 27q3 3 6 0M32 27q3 3 6 0" fill="none" stroke="#4A3A12" stroke-width="2" stroke-linecap="round"/>
+          <ellipse cx="30" cy="35" rx="3" ry="2" fill="#4A3A12"/>
+          <g font-family="Arial, sans-serif" fill="#111">
+            <text x="54" y="26" font-size="16" font-weight="700">Zzzz</text>
+            <text x="54" y="42" font-size="10.5">This app has gone to sleep due to inactivity.</text>
+          </g>
+          <rect x="11" y="57" width="208" height="56" rx="9" fill="none" stroke="#F0A500" stroke-width="3"/>
+          <rect x="21" y="68" width="188" height="34" rx="4" fill="#5581DC"/>
+          <text x="115" y="90" font-family="Arial, sans-serif" font-size="13.5" fill="#fff" text-anchor="middle">Yes, get this app back up!</text>
+          <path d="M252 85H228M236 77l-9 8 9 8" fill="none" stroke="#1E3A5F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="259" y="90" font-family="Pretendard, system-ui, 'Malgun Gothic', sans-serif" font-size="14" font-weight="700" fill="#1E3A5F">이 단추</text>
+        </svg></div></li>
+      <li><span class="n">2</span><div class="body"><b>30초쯤 그대로 기다리면</b> 입력 화면이 저절로 열립니다.</div></li>
+    </ol>
+    <a id="wakeBtn" class="btn" href="#">앱 깨우러 가기</a>
+    <p class="note">다른 사람이 먼저 깨우면 이 화면에서 저절로 넘어갑니다.</p>
+  </section>
+
+  <noscript><p class="desc">자동으로 열리지 않으면 <a href="https://cheondo-mobile-v2-az9wlmsq2y2fgrarbcgnsu.streamlit.app/">여기를 눌러 주세요</a>.</p></noscript>
+</div>
 
 <script>
-  // ── 실제 입력앱(Streamlit) 주소 ──
+  // ── 실제 입력앱(Streamlit) 주소 (바꾸면 위 noscript 주소도 함께) ──
   var TARGET = "https://cheondo-mobile-v2-az9wlmsq2y2fgrarbcgnsu.streamlit.app/";
+  // 앱이 깨어 있으면 이 그림이 열리고(200), 잠들었으면 안 열립니다(400) — 2026-11-24 실제로 재어 확인.
+  var PROBE = TARGET + "~/+/favicon.png?t=";
+
+  var SLOW_MS = 5000;        // 이만큼 답이 없으면 안내부터 보여 줌(그 뒤에 열리면 저절로 넘어감)
+  var GIVE_UP_MS = 15000;    // 한 번 확인에 기다리는 시간
+  var RETRY_MS = 700;        // 한 번 실패는 순간 끊김일 수 있어 한 번 더 확인
+  var POLL_MS = 5000;        // 안내가 떠 있는 동안 다시 확인하는 간격
+  var POLL_LIMIT = 60;       // 다시 확인 횟수 상한(답이 빠르면 약 5분, 답이 없으면 최대 20분)
+  var ESCAPE_MS = 1500;      // 바깥 브라우저로 안 나가지면 수동 단추를 보여 주기까지
+
   var ua = (navigator.userAgent || "").toLowerCase();
   var isAndroid = /android/.test(ua);
   var isKakao = ua.indexOf("kakaotalk") !== -1;
   // 카톡 외 다른 인앱 브라우저들(네이버·라인·인스타·페북·밴드 등)
   var isOtherInApp = /naver|line\/|inapp|instagram|fban|fbav|band|kakaostory|everytimeapp|whale/.test(ua);
+  // 바깥 브라우저로 이미 나온 뒤인지(?ext=1). 주소에선 바로 지우고(복사해 카톡에 붙여도 안 따라가게)
+  // 이 탭에만 적어 둡니다(새로고침해도 다시 크롬으로 튕기지 않게)
+  var escaped = /[?&]ext=1(&|$)/.test(location.search);
+  var outsideUrl = location.origin + location.pathname + "?ext=1";
+  try {
+    if (escaped){ sessionStorage.setItem("cd_ext", "1"); }
+    else { escaped = sessionStorage.getItem("cd_ext") === "1"; }
+  } catch (e) {}
+  if (escaped && location.search && history.replaceState){ history.replaceState(null, "", location.pathname); }
 
-  // 수동 버튼은 항상 TARGET을 직접 가리킴(최후 보루)
-  document.getElementById("openBtn").setAttribute("href", TARGET);
+  var leaving = false;       // 앱으로 넘어가는 중(두 번 넘기지 않게)
+  var checkId = 0;           // 지금 확인의 번호(앞 확인의 늦은 답은 버림)
+  var pollCount = 0, pollTimer = null;
 
-  function showManual(){
-    document.getElementById("auto").style.display = "none";
-    document.getElementById("manual").classList.add("show");
+  document.getElementById("openBtn").href = TARGET;
+  document.getElementById("wakeBtn").href = TARGET;
+
+  function show(id){
+    ["loading", "manual", "asleep"].forEach(function(name){
+      document.getElementById(name).classList.toggle("show", name === id);
+    });
   }
 
-  function tryEscape(){
-    if (isKakao){
-      // 카카오톡: 외부 브라우저 강제 오픈
-      location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(TARGET);
-      // 혹시 실패하면 수동 버튼 노출
-      setTimeout(showManual, 1500);
-    } else if (isOtherInApp && isAndroid){
-      // 안드로이드 기타 인앱: 크롬 인텐트로 강제
-      var cleaned = TARGET.replace(/^https?:\/\//, "");
-      location.href = "intent://" + cleaned + "#Intent;scheme=https;package=com.android.chrome;end";
-      setTimeout(showManual, 1500);
-    } else if (isOtherInApp){
-      // iOS 기타 인앱: 자동 탈출 불가 → 수동 안내
-      showManual();
+  function goApp(){
+    if (leaving) return;
+    leaving = true;
+    clearTimeout(pollTimer);
+    location.replace(TARGET);
+  }
+
+  // 그림 하나로 앱 상태를 봅니다 → done("awake" 깨어 있음 / "asleep" 안 열림 / "slow" 답이 없음)
+  function probe(done){
+    var img = new Image(), finished = false;
+    function finish(state){
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      done(state);
+    }
+    var timer = setTimeout(function(){ finish("slow"); }, GIVE_UP_MS);
+    img.onload = function(){ finish("awake"); };
+    img.onerror = function(){ finish("asleep"); };
+    img.src = PROBE + Date.now();
+  }
+
+  function showAsleep(state){
+    if (leaving) return;
+    var sure = state === "asleep" && navigator.onLine !== false;
+    document.getElementById("asleepLead").textContent = sure ? "앱이 쉬고 있어요" : "앱이 아직 안 열려요";
+    document.getElementById("asleepDesc").textContent = sure
+      ? "오래 안 쓰면 앱이 잠듭니다. 한 번만 깨워 주세요."
+      : "인터넷이 느리거나 앱이 쉬고 있을 수 있어요. 와이파이/데이터를 확인하고 아래 순서로 열어 주세요.";
+    show("asleep");
+    schedulePoll();
+  }
+
+  // 안내가 떠 있는 동안 가끔 다시 확인 — 깨어나면 저절로 넘어갑니다
+  function schedulePoll(){
+    clearTimeout(pollTimer);
+    if (leaving || pollCount >= POLL_LIMIT) return;
+    pollTimer = setTimeout(function(){
+      if (document.hidden){ schedulePoll(); return; }    // 화면을 안 보고 있으면 쉼
+      pollCount += 1;
+      probe(function(state){
+        if (state === "awake"){ goApp(); } else { schedulePoll(); }
+      });
+    }, POLL_MS);
+  }
+
+  function checkThenGo(){
+    if (leaving) return;
+    checkId += 1;
+    var mine = checkId;
+    clearTimeout(pollTimer);
+    show("loading");
+    var slowTimer = setTimeout(function(){ if (mine === checkId){ showAsleep("slow"); } }, SLOW_MS);
+    function settle(state){
+      clearTimeout(slowTimer);
+      if (mine !== checkId) return;
+      if (state === "awake"){ goApp(); } else { showAsleep(state); }
+    }
+    probe(function(state){
+      if (state !== "asleep"){ settle(state); return; }
+      setTimeout(function(){ probe(settle); }, RETRY_MS);
+    });
+  }
+
+  // 앱 안에서 바깥 브라우저로 — 혹시 실패하면 수동 단추
+  function leaveInApp(url){
+    location.href = url;
+    setTimeout(function(){ show("manual"); }, ESCAPE_MS);
+  }
+
+  function start(){
+    if (isKakao && escaped){
+      show("manual");                                        // 내보냈는데 다시 카톡 안이면 되풀이하지 않음
+    } else if (isKakao){
+      // 카카오톡: 이 페이지를 바깥 브라우저에서 다시 열어, 거기서 앱이 잠들었는지 봅니다
+      leaveInApp("kakaotalk://web/openExternal?url=" + encodeURIComponent(outsideUrl));
+    } else if (isOtherInApp && isAndroid && !escaped){
+      // 안드로이드 기타 인앱: 크롬으로 강제
+      leaveInApp("intent://" + outsideUrl.replace(/^https?:\/\//, "") +
+        "#Intent;scheme=https;package=com.android.chrome;end");
+    } else if (isOtherInApp && !escaped){
+      show("manual");                                        // iOS 기타 인앱: 자동 탈출 불가 → 수동 안내
     } else {
-      // 일반 브라우저: 바로 입력앱으로
-      location.replace(TARGET);
+      checkThenGo();                                         // 일반 브라우저: 확인하고 입력앱으로
     }
   }
 
+  // 뒤로 가기로 돌아오면(브라우저가 얼려 둔 화면) 처음부터 다시 확인
+  window.addEventListener("pageshow", function(event){
+    if (!event.persisted) return;
+    leaving = false;
+    pollCount = 0;
+    if (!document.getElementById("manual").classList.contains("show")){ checkThenGo(); }
+  });
+
   // 약간의 지연 후 실행(스크립트 안정화)
-  setTimeout(tryEscape, 250);
+  setTimeout(start, 250);
 </script>
 </body>
 </html>
